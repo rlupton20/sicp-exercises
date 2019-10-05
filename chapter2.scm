@@ -502,3 +502,196 @@
 
 ;; This works because for a set (x . ys), the subsets are all subsets of ys,
 ;; and all subsets of ys with x added.
+
+;;; Exercise 2.33
+;; First let's define accumulate
+(define (accumulate op initial sequence)
+  (if (null? sequence)
+      initial
+      (op (car sequence)
+          (accumulate op initial (cdr sequence)))))
+
+(define (map-by-accumulate p sequence)
+  (accumulate (lambda (x y) (cons (p x) y)) nil sequence))
+
+(define (append-by-accumulate seq1 seq2)
+  (accumulate cons seq2 seq1))
+
+(define (length-by-accumulate sequence)
+  (accumulate (lambda (_ y) (+ 1 y)) 0 sequence))
+
+;;; Exercise 2.34
+(define (horner-eval x coefficient-sequence)
+  (accumulate (lambda (this-coeff higher-terms)
+                (+ this-coeff (* x higher-terms)))
+              0
+              coefficient-sequence))
+
+;;; Exercise 2.35
+;; Let's use enumerate tree
+(define (enumerate-tree t)
+  (cond
+   ((null? t) nil)
+   ((not (pair? t)) (list t))
+   (else (append (enumerate-tree (car t))
+                 (enumerate-tree (cdr t))))))
+
+(define (count-leaves-by-accumulate t)
+  (accumulate + 0 (map (lambda (x) 1) (enumerate-tree t))))
+
+;;; Exercise 2.36
+(define (accumulate-n op init seqs)
+  (if (null? (car seqs))
+      nil
+      (cons (accumulate op init (map car seqs))
+            (accumulate-n op init (map cdr seqs)))))
+
+;;; Exercise 2.37
+(define (dot-product v w)
+  (accumulate + 0 (map * v w)))
+
+(define (matrix-*-vector m v)
+  (map (lambda (w) (dot-product w v)) m))
+
+(define (transpose mat)
+  (accumulate-n cons nil mat))
+
+(define (matrix-*-matrix m n)
+  (let ((cols (transpose n)))
+    (map (lambda (row)
+           (map (lambda (col) (dot-product row col)) cols))
+         m)))
+
+;;; Exercise 2.38
+(define (fold-right op init seq)
+  (cond
+   ((null? seq) init)
+   (else (op (car seq) (fold-right op init (cdr seq))))))
+
+(define (fold-left op init seq)
+  (define (iter result sequence)
+    (if (null? sequence)
+        result
+        (iter (op result (car sequence)) (cdr sequence))))
+  (iter init seq))
+
+;; Want (op a b) = (op b a) and op to be associative to get fold-left and fold-right
+;; to agree
+
+;;; Exercise 2.39
+(define (reverse-fold-right s)
+  (fold-right (lambda (x y) (append y (list x))) nil s))
+
+(define (reverse-fold-left s)
+  (fold-left (lambda (x y) (cons y x)) nil s))
+
+;;; Exercise 2.40
+(define (enumerate-interval low high)
+  (define (iter cur acc)
+    (if (< cur low)
+        acc
+        (iter (- cur 1) (cons cur acc))))
+  (iter high nil))
+
+(define (flatmap p seq)
+  (accumulate append nil (map p seq)))
+
+(define (unique-pairs n)
+  (flatmap (lambda (i) (map (lambda (k) (list i k))(enumerate-interval 1 (- i 1))))
+           (enumerate-interval 1 n)))
+
+(define (prime-sum-pairs n)
+  (define (divides? n m)
+    (= 0 (remainder n m)))
+
+  (define (smallest-divisor n)
+    (find-divisor n 2))
+
+  (define (find-divisor n test-divisor)
+    (cond
+     ((< n (square test-divisor)) n)
+     ((divides? n test-divisor) test-divisor)
+     (else (find-divisor n (+ test-divisor 1)))))
+
+  (define (prime? n)
+    (and (not (= n 1)) (= n (smallest-divisor n))))
+
+  (define (prime-sum? p)
+    (prime? (+ (car p) (cadr p))))
+
+  (define (pair-sum p)
+    (list (+ (car p) (cadr p)) (car p) (cadr p)))
+
+  (map pair-sum
+       (filter prime-sum?
+               (unique-pairs n))))
+
+;;; Exercise 2.41
+(define (sum-distinct-triples n s)
+  (define (sum-pair p)
+    "The sum of a pair p."
+    (+ (car p) (cadr p)))
+
+  (define (k p)
+    "Given an i and j, compute a k"
+    (- s (sum-pair p)))
+
+  (define (permissible? triple)
+    "Does our triple k, i, j meet the constraints?"
+    (and (< (car triple) n)
+         (< (cadr triple) (car triple))))
+
+  (define (make-triple p)
+    (cons (k p) p))
+
+  (filter permissible?
+          (map make-triple
+               (unique-pairs n))))
+
+;;; Exercise 2.42
+(define (queens board-size)
+  (define empty-board nil)
+
+  (define (make-position r c)
+    (cons r c))
+  (define (row pos)
+    (car pos))
+  (define (column pos)
+    (cdr pos))
+
+  (define (adjoin-position r k rest-of-queens)
+    (cons (make-position r k) rest-of-queens))
+
+  (define (checks? pos1 pos2)
+    (or (= (row pos1) (row pos2))
+        (= (- (row pos1) (row pos2))
+           (- (column pos1) (column pos2)))
+        (= (+ (row pos1) (column pos1))
+           (+ (row pos2) (column pos2)))))
+
+  (define (safe? k positions)
+    (let ((pos (car (filter (lambda (pos) (= k (column pos))) positions)))
+          (rest (filter (lambda (pos) (not (= k (column pos)))) positions)))
+      (null? (filter (lambda (other) (checks? pos other)) rest))))
+
+  (define (queen-cols k)
+    (if (= k 0)
+        (list empty-board)
+        (filter
+         (lambda (positions) (safe? k positions))
+         (flatmap
+          (lambda (rest-of-queens)
+            (map (lambda (new-row)
+                   (adjoin-position new-row k rest-of-queens))
+                 (enumerate-interval 1 board-size)))
+          (queen-cols (- k 1))))))
+
+  (queen-cols board-size))
+
+;;; Exercise 2.43
+
+;; The problem with Louis' solution is how many times he calls (queen-cols)
+;; For each call to (queen-col k), Louis calls (queen-cols (- k 1)) board-size many times,
+;; as opposed to once for the presented solution. Therefore, if the presented solution takes
+;; time T, Louis' solution is likely to take around board-size * T time to complete, so 8 times
+;; longer than the presented solution on an 8x8 board.

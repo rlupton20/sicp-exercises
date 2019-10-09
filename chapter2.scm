@@ -695,3 +695,140 @@
 ;; as opposed to once for the presented solution. Therefore, if the presented solution takes
 ;; time T, Louis' solution is likely to take around board-size * T time to complete, so 8 times
 ;; longer than the presented solution on an 8x8 board.
+
+
+;;; Exercise 2.44
+(define (up-split painter n)
+  "Not really testable..."
+  (if (= n 0)
+      painter
+      (let ((smaller (up-split painter (- n 1))))
+        (below painter (beside smaller smaller)))))
+
+;;; Exercise 2.45
+(define (split bigger-to-smaller smaller-to-smaller)
+  (define (splitter painter n)
+    (if (= n 0)
+        painter
+        (let ((smaller (splitter painter (- n 1))))
+          (bigger-to-smaller painter (smaller-to-smaller smaller smaller)))))
+  splitter)
+
+;;; Exercise 2.46
+(define (make-vect x y)
+  (cons x y))
+
+(define (xcor-vect v)
+  (car v))
+
+(define (ycor-vect v)
+  (cdr v))
+
+(define (add-vect v w)
+  (make-vect (+ (xcor-vect v) (xcor-vect w))
+             (+ (ycor-vect v) (ycor-vect w))))
+
+(define (sub-vect v w)
+  (make-vect (- (xcor-vect v) (xcor-vect w))
+             (- (ycor-vect v) (ycor-vect w))))
+
+(define (scale-vect s v)
+  (make-vect (* s (xcor-vect v))
+             (* s (ycor-vect v))))
+
+;;; Exercise 2.47
+(define (make-frame-list origin edge1 edge2)
+  (list origin edge1 edge2))
+
+(define (origin-frame-list frame)
+  (car frame))
+
+(define (edge1-frame-list frame)
+  (cadr frame))
+
+(define (edge2-frame-list frame)
+  (caddr frame))
+
+(define (make-frame-cons origin edge1 edge2)
+  (cons origin (cons edge1 edge2)))
+
+(define (origin-frame-cons frame)
+  (car frame))
+
+(define (edge1-frame-cons frame)
+  (car (cdr frame)))
+
+(define (edge2-frame-cons frame)
+  (cdr (cdr frame)))
+
+;;; Exercise 2.48
+(define (make-segment start end)
+  (cons start end))
+
+(define (start-segment segment)
+  (car segment))
+
+(define (end-segment segment)
+  (cdr segment))
+
+;;; Exercise 2.49
+(define (segments->painter segments-list)
+  (lambda (frame)
+    (for-each
+     (lambda (segment)
+       (draw-line
+        ((frame-coord-map frame) (start-segment segment))
+        ((frame-coord-map frame) (end-segment segment))))
+     segments-list)))
+
+;; a)
+(define outline
+  (segments->painter
+   (list
+    (make-segment (make-vect 0 0) (make-vect 0 1))
+    (make-segment (make-vect 0 0) (make-vect 1 0))
+    (make-segment (make-vect 0 1) (make-vect 1 1))
+    (make-segment (make-vect 1 0) (make-vect 1 1)))))
+
+;; b)
+(define draw-x
+  (segments->painter
+   (list
+    (make-segment (make-vect 0 0) (make-vect 1 1))
+    (make-segment (make-vect 0 1) (make-vect 1 0)))))
+
+;; c)
+(define draw-diamond
+  (segments->painter
+   (list
+    (make-segment (make-vect 0.5 0) (make-vect 0 0.5))
+    (make-segment (make-vect 0 0.5) (make-vect 0.5 1))
+    (make-segment (make-vect 0.5 1) (make-vect 1 0.5))
+    (make-segment (make-vect 1 0.5) (make-vect 0.5 0)))))
+
+;; d)
+(define wave
+  (segments->painter
+   (list
+    ;; Crotch
+    (make-segment (make-vect 0.4 0) (make-vect 0.5 0.3))
+    (make-segment (make-vect 0.6 0) (make-vect 0.5 0.3))
+    ;; Left-bottom
+    (make-segment (make-vect 0.25 0) (make-vect 0.35 0.5))
+    (make-segment (make-vect 0.35 0.5) (make-vect 0.25 0.6))
+    (make-segment (make-vect 0.25 0.6) (make-vect 0.15 0.4))
+    (make-segment (make-vect 0.15 0.4) (make-vect 0 0.6))
+    ;; Left-top
+    (make-segment (make-vect 0 0.8) (make-vect 0.15 0.6))
+    (make-segment (make-vect 0.15 0.6) (make-vect 0.25 0.7))
+    (make-segment (make-vect 0.25 0.7) (make-vect 0.4 0.7))
+    (make-segment (make-vect 0.4 0.7) (make-vect 0.25 0.85))
+    (make-segment (make-vect 0.25 0.85) (make-vect 0.4 1))
+    ;; Right-bottom
+    (make-segment (make-vect 0.75 0) (make-vect 0.6 0.4))
+    (make-segment (make-vect 0.6 0.4) (make-vect 1 0.2))
+    ;; Right-top
+    (make-segment (make-vect 1 0.3) (make-vect 0.8 0.7))
+    (make-segment (make-vect 0.8 0.7) (make-vect 0.6 0.7))
+    (make-segment (make-vect 0.6 0.7) (make-vect 0.75 0.85))
+    (make-segment (make-vect 0.75 0.85) (make-vect 0.6 1)))))

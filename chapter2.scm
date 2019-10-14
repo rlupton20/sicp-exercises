@@ -832,3 +832,118 @@
     (make-segment (make-vect 0.8 0.7) (make-vect 0.6 0.7))
     (make-segment (make-vect 0.6 0.7) (make-vect 0.75 0.85))
     (make-segment (make-vect 0.75 0.85) (make-vect 0.6 1)))))
+
+;;; Exercise 2.50
+(define (transform-painter painter origin corner1 corner2)
+  (lambda (frame)
+    (let ((m (frame-coord-map frame)))
+      (let ((new-origin (m origin)))
+        (painter
+         (make-frame new-origin
+                     (sub-vect (m corner1) new-origin)
+                     (sub-vect (m corner2) new-origin)))))))
+
+(define (flip-horiz painter)
+  (transform-painter painter
+                     (make-vect 1.0 0.0)
+                     (make-vect 0.0 0.0)
+                     (make-vect 1.0 1.0)))
+
+(define (rotate-cc-180 painter)
+  (transform-painter painter
+                     (make-vect 1.0 1.0)
+                     (make-vect 0.0 1.0)
+                     (make-vect 1.0 0.0)))
+
+(define (rotate-cc-270 painter)
+  (transform-painter painter
+                     (make-vect 0.0 1.0)
+                     (make-vect 0.0 0.0)
+                     (make-vect 1.0 1.0)))
+
+;;; Exercise 2.51
+(define (below bottom top)
+  (let ((split-point (make-vect 0.0 0.5)))
+    (let
+        ((paint-bottom (transform-painter bottom
+                                          (make-vect 0.0 0.0)
+                                          (make-vect 1.0 0.0)
+                                          split-point))
+         (paint-top (transform-painter top
+                                       split-point
+                                       (make-vect 1.0 0.5)
+                                       (make-vect 0.0 1.0))))
+      (lambda (frame)
+        (paint-bottom frame)
+        (paint-top frame)))))
+
+(define (below-using-beside bottom top)
+  (flip-horiz
+   (rotate-cc-270
+    (beside bottom top))))
+
+;;; Exercise 2.52
+
+;; a)
+(define wave-mod
+  (segments->painter
+   (list
+    ;; Crotch
+    (make-segment (make-vect 0.4 0) (make-vect 0.5 0.3))
+    (make-segment (make-vect 0.6 0) (make-vect 0.5 0.3))
+    ;; Left-bottom
+    (make-segment (make-vect 0.25 0) (make-vect 0.35 0.5))
+    (make-segment (make-vect 0.35 0.5) (make-vect 0.25 0.6))
+    (make-segment (make-vect 0.25 0.6) (make-vect 0.15 0.4))
+    (make-segment (make-vect 0.15 0.4) (make-vect 0 0.6))
+    ;; Left-top
+    (make-segment (make-vect 0 0.8) (make-vect 0.15 0.6))
+    (make-segment (make-vect 0.15 0.6) (make-vect 0.25 0.7))
+    (make-segment (make-vect 0.25 0.7) (make-vect 0.4 0.7))
+    (make-segment (make-vect 0.4 0.7) (make-vect 0.25 0.85))
+    (make-segment (make-vect 0.25 0.85) (make-vect 0.4 1))
+    ;; Right-bottom
+    (make-segment (make-vect 0.75 0) (make-vect 0.6 0.4))
+    (make-segment (make-vect 0.6 0.4) (make-vect 1 0.2))
+    ;; Right-top
+    (make-segment (make-vect 1 0.3) (make-vect 0.8 0.7))
+    (make-segment (make-vect 0.8 0.7) (make-vect 0.6 0.7))
+    (make-segment (make-vect 0.6 0.7) (make-vect 0.75 0.85))
+    (make-segment (make-vect 0.75 0.85) (make-vect 0.6 1))
+    ;; (Straight) smile
+    (make-segment (make-vect 0.4 0.8) (make-vect 0.6 0.8)))))
+
+;; b)
+(define (corner-split-mod painter n)
+  (if (= n 0)
+      painter
+      (let ((up (up-split painter (- n 1)))
+            (right (right-split painter (- n 1)))
+            (corner (corner-split-mod painter (- n 1))))
+        (beside (below painter up)
+                (below right corner)))))
+
+;; c)
+(define (square-of-four tl tr bl br)
+  (lambda (painter)
+    (let ((top (beside (tl painter) (tr painter)))
+          (bottom (beside (bl painter) (br painter))))
+      (below bottom top))))
+
+(define (square-limit-mod painter n)
+  (let ((combine4 (square-of-four identity flip-horiz
+                                  flip-vert rotate180)))
+    (combine4 (corner-split painter n))))
+
+
+;;; Exercise 2.54
+(define (my-equal? x y)
+  (cond
+   ((and (pair? x) (pair? y))
+    (and (my-equal? (car x) (car y))
+         (my-equal? (cdr x) (cdr y))))
+   (else (eq? x y))))
+
+;;; Exercise 2.55
+;; (car ''abracadabra) is the same as (car '(quote abracadabra)), from which it is
+;; clear that (car ''abracadrabra) is equivalent to the symbol quote

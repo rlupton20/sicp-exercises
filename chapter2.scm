@@ -947,3 +947,250 @@
 ;;; Exercise 2.55
 ;; (car ''abracadabra) is the same as (car '(quote abracadabra)), from which it is
 ;; clear that (car ''abracadrabra) is equivalent to the symbol quote
+
+;;; Exercise 2.56
+
+;; First let's duplicate the functions we need
+(define (deriv exp var)
+  (cond ((number? exp) 0)
+        ((variable? exp)
+         (if (same-variable? exp var) 1 0))
+        ((sum? exp)
+         (make-sum (deriv (addend exp) var)
+                   (deriv (augend exp) var)))
+        ((product? exp)
+         (make-sum
+          (make-product (multiplier exp)
+                        (deriv (multiplicand exp) var))
+          (make-product (deriv (multiplier exp) var)
+                        (multiplicand exp))))
+        (else
+         (error "unknown expression type -- DERIV" exp))))
+
+(define (variable? x)
+  (symbol? x))
+
+(define (same-variable? v1 v2)
+  (and (variable? v1) (variable? v2) (eq? v1 v2)))
+
+(define (=number? exp num)
+  (and (number? exp) (= exp num)))
+
+(define (make-sum a1 a2)
+  (cond ((=number? a1 0) a2)
+        ((=number? a2 0) a1)
+        ((and (number? a1) (number? a2)) (+ a1 a2))
+        (else (list '+ a1 a2))))
+
+(define (make-product m1 m2)
+  (cond
+   ((or (=number? m1 0) (=number? m2 0)) 0)
+   ((=number? m1 1) m2)
+   ((=number? m2 1) m1)
+   ((and (number? m1) (number? m2)) (* m1 m2))
+   (else (list '* m1 m2))))
+
+(define (sum? x)
+  (and (pair? x) (eq? (car x) '+)))
+
+(define (addend s)
+  (cadr s))
+
+(define (augend s)
+  (caddr s))
+
+(define (product? x)
+  (and (pair? x) (eq? (car x) '*)))
+
+(define (multiplier p)
+  (cadr p))
+
+(define (multiplicand p)
+  (caddr p))
+
+;; Now we can extend deriv
+(define (deriv exp var)
+  (cond ((number? exp) 0)
+        ((variable? exp)
+         (if (same-variable? exp var) 1 0))
+        ((sum? exp)
+         (make-sum (deriv (addend exp) var)
+                   (deriv (augend exp) var)))
+        ((product? exp)
+         (make-sum
+          (make-product (multiplier exp)
+                        (deriv (multiplicand exp) var))
+          (make-product (deriv (multiplier exp) var)
+                        (multiplicand exp))))
+        ((exponentiation? exp)
+         (make-product
+          (exponent exp)
+          (make-product
+           (make-exponentiation
+            (base exp)
+            (make-sum (exponent exp) -1))
+           (deriv (base exp) var))))
+        (else
+         (error "unknown expression type -- DERIV" exp))))
+
+(define (make-exponentiation b e)
+  (cond
+   ((=number? e 0) 1)
+   ((=number? e 1) b)
+   ((and (number? b) (number? e) (expt b e)))
+   (else (list '** b e))))
+
+(define (exponentiation? exp)
+  (and (pair? exp) (eq? (car exp) '**)))
+
+(define (base exp)
+  (cadr exp))
+
+(define (exponent exp)
+  (caddr exp))
+
+;;; Exercise 2.57
+;; We define new constructors and selectors for sum and product
+(define (make-sum . as)
+  (let ((exps           ; Remove all 0s
+         (filter (lambda (exp) (not (=number? exp 0))) as)))
+    (cond
+     ((null? exps) 0)
+     ((not (null? (cdr exps))) (cons '+ exps))
+     (else (car exps)))))
+
+(define (addend s)
+  (cadr s))
+
+(define (augend s)
+  (apply make-sum (cddr s)))
+
+(define (make-product . ms)
+  (define (find p xs)
+    (cond
+     ((null? xs) #f)
+     ((p (car xs)) (car xs))
+     (else (find p (cdr xs)))))
+
+  (if (find (lambda (exp) (=number? exp 0)) ms)
+      0                 ; We have a zero
+      (let ((exps       ; Remove all 1s
+             (filter (lambda (exp) (not (=number? exp 1))) ms)))
+        (cond
+         ((null? exps) 1)
+         ((not (null? (cdr exps))) (cons '* exps))
+         (else (car exps))))))
+
+(define (multiplier p)
+  (cadr p))
+
+(define (multiplicand p)
+  (apply make-product (cddr p)))
+
+
+;;; Exercise 2.58
+;; a)
+(define (make-sum a1 a2)
+  (cond
+   ((=number? a1 0) a2)
+   ((=number? a2 0) a1)
+   ((and (number? a1) (number? a2)) (+ a1 a2))
+   (else (list a1 '+ a2))))
+
+(define (sum? s)
+  (and (pair? s) (eq? '+ (cadr s))))
+
+(define (addend s)
+  (car s))
+
+(define (augend s)
+  (caddr s))
+
+(define (make-product m1 m2)
+  (cond
+   ((or (=number? m1 0) (=number? m2 0)) 0)
+   ((=number? m1 1) m2)
+   ((=number? m2 1) m1)
+   ((and (number? m1) (number? m2)) (* m1 m2))
+   (else (list m1 '* m2))))
+
+(define (product? p)
+  (and (pair? p) (eq? '* (cadr p))))
+
+(define (multiplier p)
+  (car p))
+
+(define (multiplicand p)
+  (caddr p))
+
+;;b)
+(define (make-sum a1 a2)
+  (cond
+   ((=number? a1 0) a2)
+   ((=number? a2 0) a1)
+   ((and (number? a1) (number? a2)) (+ a1 a2))
+   (else (list a1 '+ a2))))
+
+(define (sum? s)
+  (define (finds-sum? t)
+    (cond
+     ((null? t) #f)
+     ((eq? '+ (car t)) #t)
+     (else (finds-sum? (cdr t)))))
+
+  (and (pair? s) (finds-sum? s)))
+
+(define (split-at sym s)
+  "Split the expression s at the first occurrence of s and simplify"
+  (define (strip-parens expr)
+    "Remove extraneous parentheses"
+    (if (and (pair? expr) (null? (cdr expr)))
+        (strip-parens (car expr))
+        expr))
+
+  (define (iter rh t)
+    (cond
+     ((eq? sym (car t))
+      (cons
+       (strip-parens (reverse rh))
+       (strip-parens (cdr t))))
+     (else (iter
+            (cons (car t) rh)
+            (cdr t)))))
+
+  (iter '() s))
+
+(define (addend s)
+  (car (split-at '+ s)))
+
+(define (augend s)
+  (cdr (split-at '+ s)))
+
+(define (make-product m1 m2)
+  (cond
+   ((or (=number? m1 0) (=number? m2 0)) 0)
+   ((=number? m1 1) m2)
+   ((=number? m2 1) m1)
+   ((and (number? m1) (number? m2)) (* m1 m2))
+   ((and (product? m1) (product? m2)) (append m1 (cons '* m2)))
+   ((product? m1) (append m1 (list '* m2)))
+   ((product? m2) (cons m1 (cons '* m2)))
+   (else (list m1 '* m2))))
+
+(define (product? p)
+  "We're a product if we have a highest level * and no lower precedence operators (+)"
+  (define (finds-product? q)
+    (cond
+     ((null? q) #f)
+     ((eq? '* (car q)) #t)
+     (else (finds-product? (cdr q)))))
+
+  (and (pair? p)
+       (not (sum? p))
+       (finds-product? p)))
+
+(define (multiplier p)
+  (car (split-at '* p)))
+
+(define (multiplicand p)
+  (cdr (split-at '* p)))

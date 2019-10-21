@@ -1194,3 +1194,210 @@
 
 (define (multiplicand p)
   (cdr (split-at '* p)))
+
+;;; Exercise 2.59
+(define (element-of-set? x set)
+  (cond
+   ((null? set) #f)
+   ((equal? (car set) x) #t)
+   (else (element-of-set? x (cdr set)))))
+
+(define (union-set s t)
+  (cond
+   ((null? s) t)
+   ((null? t) s)
+   ((element-of-set? (car s) t) (union-set (cdr s) t))
+   (else (union-set (cdr s) (cons (car s) t)))))
+
+;;; Exercise 2.60
+;; element-of-set? remains the same in the non-deduplicated representation
+;; adjoin-set and intersection-set also remains the same - let's implement it
+(define (adjoin-set x set)
+  (if (element-of-set? x set)
+      set
+      (cons x set)))
+
+(define (intersection-set set1 set2)
+  (cond
+   ((or (null? set1) (null? set2)) '())
+   ((element-of-set? (car set1) set2) (cons (car set1)
+                                            (intersection-set (cdr set1) set2)))
+   (else (intersection-set (cdr set1) set2))))
+
+;; union can be made more efficient - we can just append
+(define (union-set-dup set1 set2)
+  (append set1 set2))
+
+;; Efficiency is comparable - unions are faster, being linear in the sum of the sizes
+;; of the sets. Sets may be larger than their number of elements, however, since there
+;; is no deduplication.
+;;
+;; If fast unions are a main concern, then the duplicated version of set may be
+;; preferable to the deduplicated one.
+
+;;; Exercise 2.61
+(define (adjoin-set x set)
+  (cond
+   ((null? set) (list x))
+   ((= x (car set)) set)
+   ((< (car set) x) (cons (car set) (adjoin-set x (cdr set))))
+   (else (cons x set))))
+
+;;; Exercise 2.62
+(define (union-set set1 set2)
+  (cond
+   ((null? set1) set2)
+   ((null? set2) set1)
+   (else
+    (let ((x1 (car set1))
+          (x2 (car set2)))
+      (cond
+       ((= x1 x2) (cons x1 (union-set (cdr set1) (cdr set2))))
+       ((< x1 x2) (cons x1 (union-set (cdr set1) set2)))
+       (else (cons x2 (union-set set1 (cdr set2)))))))))
+
+;;; Exercise 2.63
+(define (entry tree) (car tree))
+(define (left-branch tree) (cadr tree))
+(define (right-branch tree) (caddr tree))
+(define (make-tree entry left right)
+  (list entry left right))
+
+(define (tree->list-1 tree)
+  (if (null? tree)
+      '()
+      (append (tree->list-1 (left-branch tree))
+              (cons (entry tree)
+                    (tree->list-1 (right-branch tree))))))
+
+(define (tree->list-2 tree)
+  (define (copy-to-list tree result-list)
+    (if (null? tree)
+        result-list
+        (copy-to-list (left-branch tree)
+              (cons (entry tree)
+                    (copy-to-list (right-branch tree) result-list)))))
+
+  (copy-to-list tree '()))
+
+;; a) Both of these procedures produce the same output for the same input tree
+;; Figure 2.16 produces
+;; - (1 3 5 7 9 11)
+
+;; tree->list-2 cons-es each entry of the tree onto the result-list once, and
+;; grows theta(n), where n is the number of entries in a (balanced) binary tree.
+;; Balance of the tree is not required for this result.
+
+;; tree-list-1 is slightly less efficient. tree->list-1 is called n times, once
+;; for each entry in the tree, but the use of append means elements are cons-ed
+;; onto a results list more than once.
+;;
+;;     a
+;;    / \
+;;   b   r
+;;  / \
+;; c   d
+;;
+;; Observe in the above c will be appended to (b d), then (c b d) will be appended
+;; to (a r), so in the append c will be touched twice. In general, an entry will be
+;; cons-ed proportionally to the log of it's left-branching-depth.
+;;
+;; Another way to look at this is that for a balanced tree, each first argument to
+;; append has approximately half elements which have been cons-ed before. So for a
+;; tree with n elements, approximately n/2 entries are cons-ed once, approximately
+;; (n/4) cons-ed twice, etc. In sum this means approximately (n/2) * log n cons-es
+;; happen, so the number of list cons-es grows as n*log(n).
+
+;;; Exercise 2.64
+(define (list->tree elements)
+  (car (partial-tree elements (length elements))))
+
+(define (partial-tree elts n)
+  (if (= n 0)
+      (cons '() elts)
+      (let ((left-size (quotient (- n 1) 2)))
+        (let ((left-result (partial-tree elts left-size)))
+          (let ((left-tree (car left-result))
+                (non-left-elts (cdr left-result))
+                (right-size (- n (+ left-size 1))))
+            (let ((this-entry (car non-left-elts))
+                  (right-result (partial-tree (cdr non-left-elts)
+                                              right-size)))
+              (let ((right-tree (car right-result))
+                    (remaining-elts (cdr right-result)))
+                (cons (make-tree this-entry left-tree right-tree)
+                      remaining-elts))))))))
+
+;; a) partial tree works by observing that for a balanced tree, roughly
+;; half of the elements will end up in the left branch, and half in the
+;; right (with one for the entry). It works by consuming enough elements
+;; for the left subtree, and forming a tree (by calling itself recursively).
+;; it then takes an element for the entry, and forms the right subtree with
+;; the remaining elements, gluing together the pieces of the tree, and
+;; returning that tree with the unconsumed elements.
+;;
+;; (list->tree '(1 3 5 7 9 11)) produces:
+;;
+;;           5
+;;          / \
+;;         1   \
+;;          \   \
+;;           3   9
+;;              / \
+;;             7  11
+
+;; b) The order of growth of list-to-tree to convert a list of n elements
+;; is theta(n). To see this, observe that we call partial-tree precisely
+;; once for each entry in the tree.
+
+;;; Exercise 2.65
+;; We use list->tree and tree->list-2, both of which have theta(n) growth,
+;; where n is the number of elements in the list/tree passed as input.
+
+;; union-set will consist of converting the trees to lists, merging the two
+;; lists, and then forming a tree.
+;; intersection-set will consist of converting the trees to lists, and then
+;; intersecting the two ordered lists.
+
+(define (union-ordered-list list1 list2)
+  (cond
+   ((null? list1) list2)
+   ((null? list2) list1)
+   ((= (car list1) (car list2)) (cons (car list1)
+                                      (union-ordered-list (cdr list1) (cdr list2))))
+   ((< (car list1) (car list2)) (cons (car list1)
+                                      (union-ordered-list (cdr list1) list2)))
+   (else (cons (car list2) (union-ordered-list list1 (cdr list2))))))
+
+
+(define (intersection-ordered-list list1 list2)
+  (cond
+   ((or (null? list1) (null? list2)) '())
+   ((= (car list1) (car list2)) (cons (car list1)
+                                      (intersection-ordered-list (cdr list1) (cdr list2))))
+   ((< (car list1) (car list2)) (intersection-ordered-list (cdr list1) list2))
+   (else (intersection-ordered-list list1 (cdr list2)))))
+
+(define (union-set set1 set2)
+  (list->tree
+   (union-ordered-list (tree->list-2 set1)
+                       (tree->list-2 set2))))
+
+(define (intersection-set set1 set2)
+  (list->tree
+   (intersection-ordered-list (tree->list-2 set1)
+                              (tree->list-2 set2))))
+
+;;; Exercise 2.66
+(define (lookup given-key set-of-records)
+  (cond
+   ((null? set-of-records) #f)
+   ((= given-key (key (entry set-of-records))) (entry set-of-records))
+   ((< given-key (key (entry set-of-records))) (lookup given-key
+                                                       (left-branch set-of-records)))
+   (else (lookup given-key (right-branch set-of-records)))))
+
+;; We can test this with a trivial key function and a set of records consisting of
+;; just keys
+(define (key record)
+  record)

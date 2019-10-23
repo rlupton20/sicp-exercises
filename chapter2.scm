@@ -1401,3 +1401,209 @@
 ;; just keys
 (define (key record)
   record)
+
+;;; Exercise 2.67
+;; First let's define the functions we need for Huffman trees
+(define (make-leaf symbol weight)
+  (list 'leaf symbol weight))
+
+(define (leaf? object)
+  (eq? (car object) 'leaf))
+
+(define (symbol-leaf x)
+  (cadr x))
+
+(define (weight-leaf x)
+  (caddr x))
+
+(define (make-code-tree left right)
+  (list left
+        right
+        (append (symbols left) (symbols right))
+        (+ (weight left) (weight right))))
+
+(define (left-branch tree)
+  (car tree))
+
+(define (right-branch tree)
+  (cadr tree))
+
+(define (symbols tree)
+  (if (leaf? tree)
+      (list (symbol-leaf tree))
+      (caddr tree)))
+
+(define (weight tree)
+  (if (leaf? tree)
+      (weight-leaf tree)
+      (cadddr tree)))
+
+(define (decode bits tree)
+  (define (decode-1 bits current-branch)
+    (if (null? bits)
+        '()
+        (let ((next-branch (choose-branch (car bits) current-branch)))
+          (if (leaf? next-branch)
+              (cons (symbol-leaf next-branch)
+                    (decode-1 (cdr bits) tree))
+              (decode-1 (cdr bits) next-branch)))))
+  (decode-1 bits tree))
+
+(define (choose-branch bit branch)
+  (cond
+   ((= bit 0) (left-branch branch))
+   ((= bit 1) (right-branch branch))
+   (else (error "bad bit -- CHOOSE-BRANCH" bit))))
+
+;; Now for the exercise
+(define sample-tree
+  (make-code-tree (make-leaf 'A 4)
+                  (make-code-tree
+                   (make-leaf 'B 2)
+                   (make-code-tree (make-leaf 'D 1)
+                                   (make-leaf 'C 1)))))
+
+(define sample-message '(0 1 1 0 0 1 0 1 0 1 1 1 0))
+
+(define (ex-2-67)
+  (newline)
+  (display (decode sample-message sample-tree)))
+
+;;; Exercise 2.68
+(define (encode message tree)
+  (if (null? message)
+      '()
+      (append (encode-symbol (car message) tree)
+              (encode (cdr message) tree))))
+
+(define (encode-symbol sym tree)
+  (define (element? sym symbols)
+    (cond
+     ((null? symbols) #f)
+     ((eq? sym (car symbols)) #t)
+     (else (element? sym (cdr symbols)))))
+
+  (cond
+   ((leaf? tree) '())
+   ((element? sym
+              (symbols (left-branch tree)))
+    (cons 0 (encode-symbol sym (left-branch tree))))
+   ((element? sym
+              (symbols (right-branch tree)))
+    (cons 1 (encode-symbol sym (right-branch tree))))
+   (else (error "Invalid symbol -- ENCODE-SYMBOL" sym))))
+
+(define (ex-2-68)
+  (newline)
+  (display sample-message)
+  (newline)
+  (display (encode (decode sample-message sample-tree)
+                   sample-tree)))
+
+;;; Exercise 2.69
+;; First define some needed functions
+(define (adjoin-set x set)
+  (cond
+    ((null? set) (list x))
+    ((< (weight x) (weight (car set))) (cons x set))
+    (else (cons (car set) (adjoin-set x (cdr set))))))
+
+(define (make-leaf-set pairs)
+  (if (null? pairs)
+      '()
+      (let ((pair (car pairs)))
+        (adjoin-set (make-leaf (car pair)
+                               (cadr pair))
+                    (make-leaf-set (cdr pairs))))))
+
+;; Now we can do the exercise
+(define (generate-huffman-tree pairs)
+  (successive-merge (make-leaf-set pairs)))
+
+(define (successive-merge merge-set)
+  (if (null? (cdr merge-set))
+      (car merge-set)
+      (let ((new-node (make-code-tree (car merge-set) (cadr merge-set))))
+        (successive-merge (adjoin-set new-node (cddr merge-set))))))
+
+;;; Exercise 2.70
+(define rock-lyric-frequencies
+  '((a 2)
+    (boom 1)
+    (get 2)
+    (job 2)
+    (na 16)
+    (sha 3)
+    (yip 9)
+    (wah 1)))
+
+(define rock-lyric-huffman-tree
+  (generate-huffman-tree rock-lyric-frequencies))
+
+(define rock-message
+  '(get a job
+    sha na na na na na na na na
+    get a job
+    sha na na na na na na na na
+    wah yip yip yip yip yip yip yip yip yip
+    sha boom))
+
+(define encoded-rock-message
+  (encode rock-message rock-lyric-huffman-tree))
+
+(define (ex-2-70)
+  (newline)
+  (display "Number of bits required for encoded message: ")
+  (display (length encoded-rock-message))
+  (newline)
+  (display "In a fixed length encoding we would need at least ")
+  ;; An 8 bit alphabet needs at least 3 bits to encode it in a fixed
+  ;; length encoding
+  (display (* (length rock-message) 3))
+  (display " bits"))
+
+;;; Exercise 2.71
+
+;; Observe that sum _k=0 ^n s^k = 2^(n+1) - 1 by induction
+;; So sucessive merging of an alphabet of size n with relative
+;; frequencies 1,..,2^(n-1) produces a tree of shape
+;;
+;;   *
+;;  / \
+;; *   *
+;;    / \
+;;   *   *
+;;      / \
+;;     *   *
+;;        / \
+;;        ...
+;;
+;; Because repeated application of successive-merge will accumulate
+;; a tree at the head of the list, consuming the next leaf each time.
+;;
+;; This means that the least frequent character will need n bits to
+;; encode, while the most frequent character needs 1 bit.
+
+;;; Exercise 2.72
+
+;; We want to estimate the order of growth of encode-symbol.
+;; Exercise 2.71 gives an interesting worst case for our analysis, so we'll
+;; capture that.
+;;
+;; For the most frequent symbol, encode-symbol (in the setting of 2.71) scales
+;; as a constant (theta(1)) with n.
+;;
+;; For the worst case, the least frequent symbol, we recursively call ourselves
+;; n times, but have to do an element lookup at each level, by traversing a list
+;; of size
+;; n - 1
+;; n - 2
+;; n - 3
+;;
+;; 1
+;;
+;; This sums to 1/2 * (n-1) * n, (assuming the element is on average in the middle
+;; of the search list only changes this by a constant factor), so encode-symbol grows
+;; as n^2 in the setting of 2.71 when encoding the least frequent symbol.
+;;
+;; This is the worst possible case for encode-symbol on a symbol set of size n.

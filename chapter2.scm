@@ -1770,3 +1770,56 @@
 ;; To incorporate new personnel information information into the system, each
 ;; new division just needs to register the appropriate interface functions under
 ;; a symbol corresponding to its division's file name.
+
+;;; Exercise 2.75
+(define (make-from-mag-ang mag ang)
+  (define (dispatch op)
+    (cond ((eq? op 'real-part) (* mag (cos ang)))
+          ((eq? op 'imag-part) (* mag (sin ang)))
+          ((eq? op 'magnitude) mag)
+          ((eq? op 'angle) ang)
+          (else
+           (error "Unknown op -- MAKE-FROM-REAL-IMAG" op))
+          ))
+
+  dispatch)
+
+;;; Exercise 2.76
+
+;; Explicit dispatch
+;;
+;; Adding new types in the explicit dispatch scenario requires that each
+;; existing generic operation be updated to add an explicit dispatch for
+;; that type. Adding a new operation only requires writing the operation
+;; for each type, and writing the generic operation which does the
+;; explicit dispatch for each type.
+;;
+;; Data-directed dispatch
+;;
+;; Adding new types requires no update to the generic dispatcher, or
+;; existing function - it just requires a new set of specific implementations
+;; of each operation be added under a new type tag. Adding a new operation
+;; requires each implementation to register the new operation under its
+;; type tag, and for a generic dispatched to be written for it (which is just
+;; a light wrapper around apply-generic). Note that the extension doesn't
+;; have to be registered at the same time as all the other operations.
+;;
+;; Message passing
+;;
+;; Adding a new type requires writing a new function to create a dispatcher
+;; for that new type, handling each of the existing operations. Adding a new
+;; operation requires all existing types' internal dispatchers be updated
+;; to handle the new operation.
+;;
+;;
+;; Clearly explicit dispatch is worst for adding a new type (since all
+;; operations need to be updated). Data-directed dispatch and message passing
+;; are comparable.
+;;
+;; For adding new operations, both message passing and data-directed
+;; dispatch require similar amounts of work (the generic dispatcher for
+;; the data-directed version is quite lightweight to write). The data-directed
+;; dispatch has the advantage of being modular however. Explicit dispatch
+;; requires a lot of discrimination code, which for few types might be
+;; manageable, but for many types, gets out of hand fast.
+

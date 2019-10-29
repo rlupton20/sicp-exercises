@@ -1565,7 +1565,7 @@
 ;;; Exercise 2.71
 
 ;; Observe that sum _k=0 ^n s^k = 2^(n+1) - 1 by induction
-;; So sucessive merging of an alphabet of size n with relative
+;; So successive merging of an alphabet of size n with relative
 ;; frequencies 1,..,2^(n-1) produces a tree of shape
 ;;
 ;;   *

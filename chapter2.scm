@@ -1607,3 +1607,166 @@
 ;; as n^2 in the setting of 2.71 when encoding the least frequent symbol.
 ;;
 ;; This is the worst possible case for encode-symbol on a symbol set of size n.
+
+;;; Exercise 2.73
+;;
+;; a) Previously where predicates which discriminated on type were used, a dispatch
+;; on the operator used as a type tag is used instead. number? and variable? can't
+;; be assimilated into the data-directed dispatch because they don't have type tags
+;; to discriminate on.
+;;
+;; b)
+
+;; UNTESTED
+(define (operator exp) (car exp))
+(define (operands exp) (cdr exp))
+
+(define dispatch-dict '())
+(define (put name key op)
+  (cons (cons name (cons key op)) dispatch-dict))
+
+(define (install-deriv-sums-package)
+  ;; internal procedures
+  (define (make-sum a1 a2)
+    "Makes tagged sums"
+    (cond
+     ((= a1 0) a2)
+     ((= a2 0) a1)
+     ((and (number? a1) (number? a2)) (+ a1 a2))
+     (else (list '+ a1 a2))))
+
+  (define (addend s)
+    "Operate on untagged sums"
+    (car s))
+
+  (define (augend s)
+    "Operate on untagged sums"
+    (cadr s))
+
+  (define (deriv s var)
+    "Takes an untagged sum and returns the (tagged) derivative"
+    (make-sum (deriv (addend s) var)
+              (deriv (augend s) var)))
+
+  ;; interface to the rest of the system
+  (put 'deriv '+ deriv)
+  (put 'make-sum '+ make-sum))
+
+;; We parameterise over make-sum - equally, we could just assume it
+;; exists, or instead use the one from the sums package above.
+(define (install-deriv-product-package make-sum)
+  "Install the product package, parametrised over make-sum"
+  ;; internal procedures
+  (define (make-product m1 m2)
+    "Make a tagged product"
+    (cond
+     ((or (= m1 0) (= m2 0)) 0)
+     ((= m1 1) m2)
+     ((= m2 1) m1)
+     ((and (number? m1) (number? m2)) (* m1 m2))
+     (else (list '* m1 m2))))
+
+  (define (multiplier p)
+    "Operate on untagged products"
+    (car p))
+
+  (define (multiplicand p)
+    "Operate on untagged products"
+    (cadr p))
+
+  (define (deriv p var)
+    "Takes an untagged product and returns the (tagged) derivative"
+    (make-sum (make-product (deriv (multiplier p) var)
+                            (multiplicand p))
+              (make-product (multiplier p)
+                            (deriv (multiplicand p) var))))
+
+  ;; interface to the rest of the system
+  (put 'deriv '* deriv)
+  (put 'make-product '* make-product))
+
+;; c)
+(define (install-deriv-exponentiation-package make-product)
+  "Install the exponentiation package, parametrised over make-product"
+  ;; internal procedures
+  (define (make-exp b e)
+    "Make a tagged exponential"
+    (cond
+     ((= e 0) 1)
+     ((= e 1) b)
+     ((= b 1) 1)
+     ((and (number? b) (number e)) (expt b e))
+     (else (list '** b e))))
+
+  (define (base exp)
+    "Operate on untagged exponentials"
+    (car exp))
+
+  (define (exponent exp)
+    "Operate on untagged exponentials"
+    (cadr exp))
+
+  (define (deriv exp var)
+    "Takes an untagged exponential and returns the (tagged) derivative"
+    (make-product (make-product (exponent exp)
+                                (make-exp (base exp)
+                                          (- (exponent exp) 1))
+                                (deriv (base exp) var))))
+  ;; interface to the rest of the system
+  (put 'deriv '** deriv)
+  (put 'make-exp '** make-exp))
+
+;; d)
+;; We may need to change how put is used (if its interface mirrors get), but
+;; apart from that, no changes are needed to the derivative system.
+
+;;; Exercise 2.74
+
+;; Let's suppose that each file will be type tagged with a symbol corresponding
+;; to the filename, and that each file will also register under this symbol
+;; appropriate functions for looking up records, and also for querying the records
+;; for specified keys.
+
+;; UNTESTED, since nothing to test with.
+
+;; a)
+
+(define (get-record division-file employee-id)
+  (define (tag x)
+    (cons division-file x))
+
+  (apply-generic 'get-record (tag employee-id)))
+
+;; This requires each division file to register under a symbol corresponding to
+;; its filename a function get-record which takes an employee id, and returns
+;; either a (tagged!) record if found, and, for example, false otherwise.
+
+;; b)
+(define (get-salary division-file record)
+  (define (tag x)
+    (cons division-file x))
+
+  (apply-generic 'get-salary record))
+
+;; The record isn't required to be structured in any particular way for this to
+;; work, but it is required to register under the division-file type tag a
+;; get-salary function which takes a record and returns the salary on that
+;; record.
+;;
+;; Note that by making get-record above return a tag typed record, we can
+;; pass the record straight into get-salary, relying on the generic dispatch
+;; to pick the correct handler.
+
+;; c)
+(define (find-employee-record employee-id division-files)
+  (if (null? division-files)
+      #f
+      (let ((lookup (get-record (car division-files) employee-id)))
+        (if lookup lookup
+            (find-employee-record employee-id (cdr division-files))))))
+
+;; d)
+
+;; To incorporate new personnel information information into the system, each
+;; new division just needs to register the appropriate interface functions under
+;; a symbol corresponding to its division's file name.
